@@ -1,22 +1,38 @@
 {
   "name": "dpk-shop",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node tests/critical-flows.test.js",
+    "seed": "node prisma/seed.js",
+    "db:import": "node prisma/import-store.js"
   },
   "dependencies": {
+    "@prisma/adapter-neon": "^7.10.1",
+    "@prisma/client": "6.4.1",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "jose": "^6.2.13",
+    "lucide-react": "^1.61.0",
     "next": "16.4.2",
+    "razorpay": "^2.9.8",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "react-hook-form": "^7.90.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/turbopack": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "prisma": "6.4.1",
     "tailwindcss": "^4"
   }
 }
