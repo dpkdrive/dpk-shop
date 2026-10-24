@@ -20,7 +20,7 @@ export default async function OrderSuccessPage({ searchParams }) {
 
         <div className="space-y-1">
           <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">
-            Payment & Order Confirmed
+            Order {order?.paymentMethod === 'COD' ? 'Placed' : 'Payment & Order Confirmed'}
           </span>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
             Thank you for your order!
@@ -94,7 +94,7 @@ export default async function OrderSuccessPage({ searchParams }) {
               </p>
               <p className="text-slate-900">
                 Payment Status:{' '}
-                <span className="font-bold text-emerald-600">{order.paymentStatus}</span>
+                <span className={`font-bold ${order.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}`}>{order.paymentStatus}</span>
               </p>
               <p className="text-slate-900">
                 Order Status:{' '}
@@ -124,7 +124,7 @@ export default async function OrderSuccessPage({ searchParams }) {
             </div>
 
             <div className="border-t border-slate-200 mt-4 pt-3 flex justify-between items-baseline font-bold text-base">
-              <span>Total Paid</span>
+              <span>{order.paymentStatus === 'PAID' ? 'Total Paid' : 'Total Due'}</span>
               <span className="text-xl text-slate-900">{formatPrice(order.totalAmount)}</span>
             </div>
           </div>

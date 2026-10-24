@@ -188,13 +188,12 @@ test('4. Order Placement, Inventory Deduction & Security Tests', async (t) => {
     assert.equal(testOrder.paymentStatus, 'PENDING'); // COD starts PENDING
   });
 
-  await t.test('Razorpay signature verification test', () => {
-    // In test mode / test prefix
+  await t.test('Razorpay rejects simulated signatures', () => {
     const verified = verifyRazorpaySignature(
       'order_test_123',
       'pay_test_456',
       'any_signature'
     );
-    assert.equal(verified, true, 'Test mode signature verification should succeed');
+    assert.equal(verified, false, 'A test order prefix must not bypass signature verification');
   });
 });

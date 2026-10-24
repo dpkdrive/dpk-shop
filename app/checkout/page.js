@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import Script from 'next/script';
 import {
   ShieldCheck,
   CreditCard,
@@ -54,6 +55,8 @@ export default function CheckoutPage() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRazorpayLoaded, setIsRazorpayLoaded] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (e) => {
@@ -84,38 +87,39 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Create Order on Server
-      const orderRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          items: cartItems.map((item) => ({
-            productId: item.productId,
-            variantName: item.variantName,
-            quantity: item.quantity,
-          })),
-          couponCode: coupon?.code || null,
-        }),
-      });
-
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) {
-        throw new Error(orderData.error || 'Failed to initialize order');
+      if (formData.paymentMethod === 'RAZORPAY' && (!isRazorpayLoaded || typeof window.Razorpay !== 'function')) {
+        throw new Error('Secure payment checkout is still loading. Please try again in a moment.');
       }
 
-      const createdOrder = orderData.order;
-
-      // 2. Handle Payment
-      if (formData.paymentMethod === 'RAZORPAY') {
-        // Request Razorpay Payment Order
-        const rzpRes = await fetch('/api/payment/razorpay/create-order', {
+      let createdOrder = pendingOrder;
+      const savedPendingOrderId = formData.paymentMethod === 'RAZORPAY'
+        ? window.sessionStorage.getItem('dpkPendingRazorpayOrderId')
+        : null;
+      if (!createdOrder) {
+        const orderRes = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            amount: createdOrder.totalAmount,
-            receiptId: createdOrder.orderNumber,
+            ...formData,
+            existingOrderId: savedPendingOrderId,
+            items: cartItems.map((item) => ({ productId: item.productId, variantName: item.variantName, quantity: item.quantity })),
+            couponCode: coupon?.code || null,
           }),
+        });
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) throw new Error(orderData.error || 'Failed to initialize order');
+        createdOrder = orderData.order;
+        if (formData.paymentMethod === 'RAZORPAY') {
+          setPendingOrder(createdOrder);
+          window.sessionStorage.setItem('dpkPendingRazorpayOrderId', createdOrder.id);
+        }
+      }
+
+      if (formData.paymentMethod === 'RAZORPAY') {
+        const rzpRes = await fetch('/api/payment/razorpay/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: createdOrder.id }),
         });
 
         const rzpData = await rzpRes.json();
@@ -123,38 +127,9 @@ export default function CheckoutPage() {
           throw new Error(rzpData.error || 'Payment gateway setup error');
         }
 
-        // Check if Razorpay script is present or if running in test simulation mode
-        // if (rzpData.isTestSimulation || typeof window.Razorpay === 'undefined') {
-        //   // Verify simulation / test payment on server
-        //   const verifyRes = await fetch('/api/payment/razorpay/verify', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify({
-        //       orderId: createdOrder.id,
-        //       razorpayOrderId: rzpData.id,
-        //       razorpayPaymentId: `pay_sim_${Date.now()}`,
-        //       razorpaySignature: 'simulated_signature_verified',
-        //     }),
-        //   });
-
-        //   if (!verifyRes.ok) {
-        //     throw new Error('Payment confirmation error');
-        //   }
-        // }
-
-        if (formData.paymentMethod === 'RAZORPAY') {
-          if (
-            rzpData.isTestSimulation ||
-            typeof window.Razorpay === 'undefined'
-          ) {
-            throw new Error(
-              'Razorpay is not configured correctly. Please reload and try again.'
-            );
-          }
-
-          const paymentResponse = await new Promise((resolve, reject) => {
+        await new Promise((resolve, reject) => {
             const options = {
-              key: rzpData.keyId,
+              key: rzpData.key,
               amount: rzpData.amount,
               currency: rzpData.currency || 'INR',
               name: 'DPK Shop',
@@ -217,14 +192,13 @@ export default function CheckoutPage() {
 
             razorpay.open();
           });
-        }
+        setPendingOrder(null);
+        window.sessionStorage.removeItem('dpkPendingRazorpayOrderId');
       }
 
-      // 3. Clear cart and redirect to order success page
       clearCart();
       router.push(`/checkout/success?orderNumber=${createdOrder.orderNumber}`);
     } catch (err) {
-      console.error('Checkout error:', err);
       setErrorMessage(err.message || 'An error occurred while placing your order. Please try again.');
       setIsSubmitting(false);
     }
@@ -247,6 +221,12 @@ export default function CheckoutPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <Script
+        src="https://checkout.razorpay.com/v1/checkout.js"
+        strategy="afterInteractive"
+        onReady={() => setIsRazorpayLoaded(typeof window.Razorpay === 'function')}
+        onError={() => setErrorMessage('Unable to load secure payment checkout. Check your connection and reload.')}
+      />
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
           Secure Checkout

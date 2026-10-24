@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createOrder, getOrders } from '@/lib/db';
+import { canUsePrisma, createOrder, getOrderById, getOrders } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -28,6 +28,13 @@ export async function POST(request) {
     const user = await getCurrentUser();
     const body = await request.json();
 
+    if (body.paymentMethod === 'RAZORPAY' && !user) {
+      return NextResponse.json({ error: 'Sign in before placing an online payment order.' }, { status: 401 });
+    }
+    if (body.paymentMethod === 'RAZORPAY' && !(await canUsePrisma())) {
+      return NextResponse.json({ error: 'Online payment is temporarily unavailable. Please try again later.' }, { status: 503 });
+    }
+
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
@@ -38,6 +45,15 @@ export async function POST(request) {
 
     if (!body.shippingStreet || !body.shippingCity || !body.shippingPincode) {
       return NextResponse.json({ error: 'Complete shipping address is required' }, { status: 400 });
+    }
+
+    if (body.existingOrderId) {
+      if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      const existingOrder = await getOrderById(body.existingOrderId);
+      if (!existingOrder || existingOrder.userId !== user.id || existingOrder.paymentMethod !== 'RAZORPAY' || existingOrder.paymentStatus !== 'PENDING') {
+        return NextResponse.json({ error: 'Pending order is no longer eligible for payment.' }, { status: 409 });
+      }
+      return NextResponse.json({ success: true, order: existingOrder });
     }
 
     const orderPayload = {
