@@ -124,22 +124,99 @@ export default function CheckoutPage() {
         }
 
         // Check if Razorpay script is present or if running in test simulation mode
-        if (rzpData.isTestSimulation || typeof window.Razorpay === 'undefined') {
-          // Verify simulation / test payment on server
-          const verifyRes = await fetch('/api/payment/razorpay/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              orderId: createdOrder.id,
-              razorpayOrderId: rzpData.id,
-              razorpayPaymentId: `pay_sim_${Date.now()}`,
-              razorpaySignature: 'simulated_signature_verified',
-            }),
-          });
+        // if (rzpData.isTestSimulation || typeof window.Razorpay === 'undefined') {
+        //   // Verify simulation / test payment on server
+        //   const verifyRes = await fetch('/api/payment/razorpay/verify', {
+        //     method: 'POST',
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify({
+        //       orderId: createdOrder.id,
+        //       razorpayOrderId: rzpData.id,
+        //       razorpayPaymentId: `pay_sim_${Date.now()}`,
+        //       razorpaySignature: 'simulated_signature_verified',
+        //     }),
+        //   });
 
-          if (!verifyRes.ok) {
-            throw new Error('Payment confirmation error');
+        //   if (!verifyRes.ok) {
+        //     throw new Error('Payment confirmation error');
+        //   }
+        // }
+
+        if (formData.paymentMethod === 'RAZORPAY') {
+          if (
+            rzpData.isTestSimulation ||
+            typeof window.Razorpay === 'undefined'
+          ) {
+            throw new Error(
+              'Razorpay is not configured correctly. Please reload and try again.'
+            );
           }
+
+          const paymentResponse = await new Promise((resolve, reject) => {
+            const options = {
+              key: rzpData.keyId,
+              amount: rzpData.amount,
+              currency: rzpData.currency || 'INR',
+              name: 'DPK Shop',
+              description: 'Order Payment',
+              order_id: rzpData.id,
+
+              handler: async (response) => {
+                try {
+                  const verifyRes = await fetch(
+                    '/api/payment/razorpay/verify',
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        orderId: createdOrder.id,
+                        razorpayOrderId:
+                          response.razorpay_order_id,
+                        razorpayPaymentId:
+                          response.razorpay_payment_id,
+                        razorpaySignature:
+                          response.razorpay_signature,
+                      }),
+                    }
+                  );
+
+                  const verifyData = await verifyRes.json();
+
+                  if (!verifyRes.ok) {
+                    throw new Error(
+                      verifyData.error ||
+                      'Payment verification failed'
+                    );
+                  }
+
+                  resolve(verifyData);
+                } catch (error) {
+                  reject(error);
+                }
+              },
+
+              modal: {
+                ondismiss: () => {
+                  reject(new Error('Payment was cancelled.'));
+                },
+              },
+            };
+
+            const razorpay = new window.Razorpay(options);
+
+            razorpay.on('payment.failed', (response) => {
+              reject(
+                new Error(
+                  response.error?.description ||
+                  'Payment failed. Please try again.'
+                )
+              );
+            });
+
+            razorpay.open();
+          });
         }
       }
 
@@ -347,11 +424,10 @@ export default function CheckoutPage() {
             <div className="space-y-3">
               {/* Razorpay Online Payment */}
               <label
-                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  formData.paymentMethod === 'RAZORPAY'
-                    ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-600/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
+                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${formData.paymentMethod === 'RAZORPAY'
+                  ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-600/20'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
               >
                 <input
                   type="radio"
@@ -379,11 +455,10 @@ export default function CheckoutPage() {
 
               {/* Cash on Delivery */}
               <label
-                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
-                  formData.paymentMethod === 'COD'
-                    ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-600/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-white'
-                }`}
+                className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${formData.paymentMethod === 'COD'
+                  ? 'border-blue-600 bg-blue-50/50 ring-2 ring-blue-600/20'
+                  : 'border-slate-200 hover:border-slate-300 bg-white'
+                  }`}
               >
                 <input
                   type="radio"
