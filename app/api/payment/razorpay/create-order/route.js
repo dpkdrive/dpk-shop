@@ -13,7 +13,8 @@ export async function POST(request) {
     const { orderId } = await request.json();
     if (!orderId) return NextResponse.json({ error: 'Application order ID is required.' }, { status: 400 });
     const result = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${orderId}, 0))`;
+      // Return a Prisma-decodable scalar while acquiring the transaction-scoped lock.
+      await tx.$queryRaw`WITH payment_lock AS (SELECT pg_advisory_xact_lock(hashtextextended(${orderId}, 0))) SELECT 1 AS locked`;
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { payments: true } });
       if (!order || order.userId !== user.id) return { error: 'Order not found.', status: 404 };
       if (order.paymentMethod !== 'RAZORPAY' || order.paymentStatus !== 'PENDING' || order.orderStatus === 'CANCELLED') {
@@ -41,7 +42,12 @@ export async function POST(request) {
     if (result.error) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json(result.gatewayOrder);
   } catch (error) {
-    console.error('Razorpay order creation failed:', error.message);
+    console.error('Razorpay order creation failed:', {
+      name: error.name,
+      code: error.code,
+      statusCode: error.statusCode,
+      message: error.message,
+    });
     return NextResponse.json({ error: 'Failed to initiate payment. Please try again.' }, { status: 500 });
   }
 }
