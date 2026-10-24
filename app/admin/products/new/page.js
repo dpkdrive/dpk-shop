@@ -21,7 +21,7 @@ export default function NewProductPage() {
     lowStockAlert: '5',
     description: '',
     details: '',
-    imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1000&q=80',
+    imageUrl: '',
     isPublished: true,
     isFeatured: false,
     isTrending: false,
@@ -29,6 +29,7 @@ export default function NewProductPage() {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -61,17 +62,28 @@ export default function NewProductPage() {
     e.preventDefault();
     setError('');
 
-    if (!formData.name || !formData.price || !formData.categoryId) {
-      setError('Please provide product name, price, and category');
+    if (!formData.name || !formData.price || !formData.categoryId || !imageFile) {
+      setError('Please provide product name, price, category, and an image.');
       return;
     }
 
     setSubmitting(true);
     try {
+      const uploadData = new FormData();
+      uploadData.append('file', imageFile);
+      const uploadRes = await fetch('/api/uploads/product-image', {
+        method: 'POST',
+        body: uploadData,
+      });
+      const uploadResult = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadResult.error || 'Failed to upload product image.');
+      }
+
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, imageUrl: uploadResult.imageUrl }),
       });
 
       const data = await res.json();
@@ -208,16 +220,20 @@ export default function NewProductPage() {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-              Image URL *
+            <label htmlFor="product-image" className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+              Product Image *
             </label>
             <input
-              type="url"
+              id="product-image"
+              type="file"
               required
-              value={formData.imageUrl}
-              onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white file:mr-4 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-xs file:font-bold file:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <p className="mt-2 text-xs text-slate-500">
+              {imageFile ? `${imageFile.name} · ${(imageFile.size / (1024 * 1024)).toFixed(2)} MB` : 'JPEG, PNG, WebP, or AVIF. Maximum file size: 4 MB.'}
+            </p>
           </div>
 
           <div className="sm:col-span-2">
@@ -286,7 +302,7 @@ export default function NewProductPage() {
           disabled={submitting}
           className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-colors shadow-md flex items-center justify-center gap-2"
         >
-          {submitting ? 'Publishing Product...' : 'Publish Product to Store'}
+          {submitting ? 'Uploading Image & Publishing...' : 'Publish Product to Store'}
         </button>
       </form>
     </div>
