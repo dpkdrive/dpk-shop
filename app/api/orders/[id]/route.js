@@ -12,9 +12,11 @@ export async function GET(request, { params }) {
     }
 
     const user = await getCurrentUser();
-    // Allow if admin or order belongs to user or guest check with email match
-    if (user && user.role !== 'ADMIN' && order.userId && order.userId !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized to view this order' }, { status: 403 });
+    // Allow if admin or order belongs to user
+    if (order.userId) {
+      if (!user || (user.role !== 'ADMIN' && order.userId !== user.id)) {
+        return NextResponse.json({ error: 'Unauthorized to view this order' }, { status: 403 });
+      }
     }
 
     return NextResponse.json({ order });

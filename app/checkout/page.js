@@ -12,6 +12,9 @@ import {
   ArrowRight,
   AlertCircle,
   Truck,
+  Tag,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
 import { formatPrice } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
@@ -19,8 +22,23 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cartItems, subtotal, discount, shippingFee, tax, total, coupon, clearCart } = useCart();
+  const {
+    cartItems,
+    subtotal,
+    discount,
+    shippingFee,
+    tax,
+    total,
+    coupon,
+    couponError,
+    applyCoupon,
+    removeCoupon,
+    clearCart,
+  } = useCart();
   const { user } = useAuth();
+
+  const [checkoutCoupon, setCheckoutCoupon] = useState('');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const [formData, setFormData] = useState({
     customerName: user?.name || '',
@@ -414,6 +432,68 @@ export default function CheckoutPage() {
                   </span>
                 </div>
               ))}
+            </div>
+
+            {/* Promo Code Input Card */}
+            <div className="border-t border-slate-100 pt-3">
+              {coupon ? (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 size={13} /> {coupon.code} Applied
+                    </span>
+                    <span className="text-[11px] text-emerald-600 block">
+                      Saved {formatPrice(discount)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="text-slate-400 hover:text-rose-600 p-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Promo Code (e.g. WELCOME10)"
+                      value={checkoutCoupon}
+                      onChange={(e) => setCheckoutCoupon(e.target.value.toUpperCase())}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs uppercase text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={isApplyingCoupon || !checkoutCoupon.trim()}
+                      onClick={async () => {
+                        setIsApplyingCoupon(true);
+                        await applyCoupon(checkoutCoupon.trim());
+                        setIsApplyingCoupon(false);
+                      }}
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-colors disabled:bg-slate-300"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {couponError && (
+                    <p className="text-[11px] text-rose-600 font-medium">{couponError}</p>
+                  )}
+                  <div className="flex items-center gap-1 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCheckoutCoupon('WELCOME10');
+                        applyCoupon('WELCOME10');
+                      }}
+                      className="text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded font-bold font-mono"
+                    >
+                      Use WELCOME10 (10% OFF &gt; ₹999)
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Calculations */}

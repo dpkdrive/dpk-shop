@@ -67,6 +67,16 @@ export function AuthProvider({ children }) {
     } catch {
       // Ignore
     }
+    try {
+      localStorage.removeItem('dpk_cart');
+      localStorage.removeItem('dpk_coupon');
+      localStorage.removeItem('dpk_cart_guest');
+      localStorage.removeItem('dpk_coupon_guest');
+      localStorage.removeItem('dpk_wishlist');
+      localStorage.removeItem('dpk_wishlist_guest');
+    } catch {
+      // Ignore
+    }
     setUser(null);
     window.location.href = '/';
   };

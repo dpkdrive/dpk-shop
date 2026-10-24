@@ -1,32 +1,79 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 
 const WishlistContext = createContext(null);
 
 export function WishlistProvider({ children }) {
   const [wishlistIds, setWishlistIds] = useState([]);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const prevUserIdRef = useRef(undefined);
+
+  const getWishlistKey = (userId) => (userId ? `dpk_wishlist_${userId}` : 'dpk_wishlist_guest');
 
   useEffect(() => {
+    if (authLoading) return;
+
+    const currentUserId = user?.id || null;
+    const isUserSwitch = prevUserIdRef.current !== undefined && prevUserIdRef.current !== currentUserId;
+    prevUserIdRef.current = currentUserId;
+
+    // Clean up legacy shared key
     try {
-      const saved = localStorage.getItem('dpk_wishlist');
-      if (saved) {
-        setWishlistIds(JSON.parse(saved));
+      localStorage.removeItem('dpk_wishlist');
+    } catch {}
+
+    const loadWishlist = async () => {
+      if (currentUserId) {
+        let localIds = [];
+        try {
+          const saved = localStorage.getItem(getWishlistKey(currentUserId));
+          if (saved) localIds = JSON.parse(saved);
+        } catch {}
+        setWishlistIds(localIds);
+
+        // Fetch user's wishlist from server
+        try {
+          const res = await fetch('/api/wishlist');
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.wishlist)) {
+              const serverIds = data.wishlist.map((item) => item.id);
+              setWishlistIds(serverIds);
+              try {
+                localStorage.setItem(getWishlistKey(currentUserId), JSON.stringify(serverIds));
+              } catch {}
+            }
+          }
+        } catch {}
+      } else {
+        if (isUserSwitch) {
+          // Logged out
+          setWishlistIds([]);
+          try {
+            localStorage.removeItem('dpk_wishlist_guest');
+          } catch {}
+        } else {
+          try {
+            const saved = localStorage.getItem('dpk_wishlist_guest');
+            if (saved) setWishlistIds(JSON.parse(saved));
+          } catch {}
+        }
       }
-    } catch {
-      // Ignore
-    }
-  }, []);
+    };
+
+    loadWishlist();
+  }, [user, authLoading]);
 
   useEffect(() => {
+    if (authLoading) return;
     try {
-      localStorage.setItem('dpk_wishlist', JSON.stringify(wishlistIds));
+      localStorage.setItem(getWishlistKey(user?.id), JSON.stringify(wishlistIds));
     } catch {
       // Ignore
     }
-  }, [wishlistIds]);
+  }, [wishlistIds, user?.id, authLoading]);
 
   const toggleWishlist = async (productId) => {
     let nextIds = [];
@@ -37,8 +84,8 @@ export function WishlistProvider({ children }) {
     }
     setWishlistIds(nextIds);
 
-    // If logged in, inform backend
-    if (user) {
+    // If logged in, update backend
+    if (user?.id) {
       try {
         await fetch('/api/wishlist', {
           method: 'POST',

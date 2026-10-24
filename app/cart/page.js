@@ -197,18 +197,24 @@ export default function CartPage() {
             </h3>
 
             {coupon ? (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                    <CheckCircle2 size={14} /> Code Applied: {coupon.code}
+                  <p className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                    <CheckCircle2 size={15} /> Code Applied: {coupon.code}
                   </p>
-                  <p className="text-[11px] text-emerald-600 mt-0.5">
-                    Saved {formatPrice(discount)}
+                  <p className="text-[11px] text-emerald-700 mt-0.5 font-medium">
+                    Saved {formatPrice(discount)} {coupon.discountValue ? `(${coupon.discountValue}% OFF)` : ''}
                   </p>
+                  {coupon.code === 'WELCOME10' && (
+                    <span className="inline-block mt-1 text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">
+                      Orders over ₹999 special discount
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={removeCoupon}
-                  className="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                  className="text-slate-400 hover:text-rose-600 p-1.5 transition-colors rounded-lg hover:bg-white"
+                  title="Remove coupon"
                 >
                   <X size={16} />
                 </button>
@@ -234,19 +240,30 @@ export default function CartPage() {
                 {couponError && (
                   <p className="text-xs text-rose-600 font-medium">{couponError}</p>
                 )}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-400">Try codes:</span>
+                {subtotal < 999 && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 rounded-xl p-2 font-medium">
+                    💡 Add {formatPrice(999 - subtotal)} more to your cart to unlock 10% OFF with <strong className="font-bold">WELCOME10</strong>!
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400">Available codes (1-click):</span>
                   <button
                     type="button"
-                    onClick={() => setCouponInput('WELCOME10')}
-                    className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-mono"
+                    onClick={() => {
+                      setCouponInput('WELCOME10');
+                      applyCoupon('WELCOME10');
+                    }}
+                    className="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg font-bold font-mono transition-colors"
                   >
-                    WELCOME10
+                    WELCOME10 (10% OFF &gt; ₹999)
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCouponInput('FLAT500')}
-                    className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-mono"
+                    onClick={() => {
+                      setCouponInput('FLAT500');
+                      applyCoupon('FLAT500');
+                    }}
+                    className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded-lg font-medium font-mono transition-colors"
                   >
                     FLAT500
                   </button>
