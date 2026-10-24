@@ -51,8 +51,18 @@ export async function POST(request) {
     });
     const uploadResult = await uploadResponse.json();
     if (!uploadResponse.ok || !uploadResult.secure_url) {
-      console.error('Cloudinary product image upload failed:', uploadResult.error?.message || uploadResponse.status);
-      return NextResponse.json({ error: 'Cloudinary could not upload this image. Please try again.' }, { status: 502 });
+      const cloudinaryMessage = String(uploadResult.error?.message || `HTTP ${uploadResponse.status}`).slice(0, 240);
+      console.error('Cloudinary product image upload failed:', {
+        status: uploadResponse.status,
+        message: cloudinaryMessage,
+      });
+
+      const credentialFailure = /invalid signature|invalid api key|unknown cloud|cloud name/i.test(cloudinaryMessage);
+      return NextResponse.json({
+        error: credentialFailure
+          ? 'Cloudinary rejected the upload credentials. Confirm CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in Vercel Production all come from the same Cloudinary account.'
+          : `Cloudinary upload failed: ${cloudinaryMessage}`,
+      }, { status: 502 });
     }
 
     return NextResponse.json({ imageUrl: uploadResult.secure_url });
